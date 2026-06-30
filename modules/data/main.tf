@@ -1,5 +1,4 @@
-# Data module: DynamoDB tables from the API spec
-# PAY_PER_REQUEST scales like a game backend should
+# DynamoDB tables: Players (+ leaderboard GSI) and Matches.
 
 resource "aws_dynamodb_table" "players" {
   name         = "${var.env}-Players"
@@ -37,7 +36,7 @@ resource "aws_dynamodb_table" "players" {
     projection_type = "ALL"
   }
 
-  # DR posture: point-in-time recovery.
+  # point-in-time recovery (continuous backups), toggled per environment.
   point_in_time_recovery {
     enabled = var.pitr_enabled
   }

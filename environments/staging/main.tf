@@ -1,5 +1,4 @@
-# staging environment wires the shared modules with staging-sized values
-# Identical structure to dev and prod only terraform.tfvars differs
+# staging environment: wires the shared modules with staging-sized values.
 
 module "network" {
   source               = "../../modules/network"

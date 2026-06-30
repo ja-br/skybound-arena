@@ -1,6 +1,4 @@
-# dev environment wires the shared modules with dev-sized values.
-# prod is the SAME file with bigger CIDRs, nat_gateway_count = 2, pitr on.
-# That sameness is the point: it proves one-command repeatability.
+# dev environment: wires the shared modules with dev-sized values.
 
 module "network" {
   source               = "../../modules/network"

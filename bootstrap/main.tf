@@ -15,7 +15,7 @@ locals {
 resource "aws_s3_bucket" "tfstate" {
   bucket = local.bucket_name
 
-  # State is the source of truth for the whole platform — make it hard to nuke.
+  # prevent_destroy guards the state bucket against `terraform destroy`.
   lifecycle {
     prevent_destroy = true
   }

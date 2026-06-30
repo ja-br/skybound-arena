@@ -1,0 +1,35 @@
+# Local dev: run the whole stack with no AWS account. DynamoDB Local stands in
+# for the real tables; `init` creates them; `api` serves on http://localhost:8080.
+#   docker compose up --build
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
+    ports:
+      - "8000:8000"
+
+  init:
+    build: .
+    depends_on:
+      - dynamodb-local
+    environment:
+      AWS_REGION: us-east-1
+      DYNAMODB_ENDPOINT_URL: http://dynamodb-local:8000
+      PLAYERS_TABLE: dev-Players
+      MATCHES_TABLE: dev-Matches
+    entrypoint: ["python", "scripts/init_local_tables.py"]
+
+  api:
+    build:
+      context: .
+      args:
+        VERSION: local-dev
+    depends_on:
+      - init
+    environment:
+      AWS_REGION: us-east-1
+      DYNAMODB_ENDPOINT_URL: http://dynamodb-local:8000
+      PLAYERS_TABLE: dev-Players
+      MATCHES_TABLE: dev-Matches
+    ports:
+      - "8080:8080"
