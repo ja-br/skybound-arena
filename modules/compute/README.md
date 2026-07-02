@@ -25,7 +25,7 @@ terraform apply -target=module.compute.aws_ecr_repository.app
 REPO=$(terraform output -raw ecr_repository_url)
 aws ecr get-login-password --region us-east-1 \
   | docker login --username AWS --password-stdin "${REPO%/*}"
-docker build -t "$REPO:bootstrap" ../../app
+docker build --platform linux/amd64 -t "$REPO:bootstrap" ../../app
 docker push "$REPO:bootstrap"
 
 # 3. Apply the rest (cluster, ALB, service, roles).
