@@ -1,4 +1,4 @@
-# Build context is app/ (see Project 2 buildspec: `docker build ... app/`).
+# Build context is app/
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \

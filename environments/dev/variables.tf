@@ -41,3 +41,9 @@ variable "pitr_enabled" {
   type        = bool
   default     = false
 }
+
+variable "app_desired_count" {
+  description = "ECS task count for the app service."
+  type        = number
+  default     = 1
+}

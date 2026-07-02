@@ -22,10 +22,10 @@ and ELO leaderboards under a "streamer spike" load test.
 ## Services & why
 
 - **FastAPI** — auto OpenAPI docs, container-friendly, minimal boilerplate.
-- **DynamoDB** — serverless, no DB to run; tables come from Project 1's
+- **DynamoDB** — serverless, no DB to run
   `modules/data` (`${env}-Players` with the `leaderboard-index` GSI, `${env}-Matches`).
 - **ECS/Fargate behind an ALB** — where the image runs; the app SG accepts
-  `8080` only from the ALB SG (Project 1).
+  `8080` only from the ALB SG 
 
 ## Key decisions
 
@@ -33,8 +33,7 @@ and ELO leaderboards under a "streamer spike" load test.
   process on purpose — it makes the case for a real queue (SQS/DynamoDB) when
   you scale past one task. Honest about the trade-off rather than hiding it.
 - **Rating is the GSI sort key.** Top-N leaderboard is a single `Query`
-  (constant `entity = "PLAYER"` PK, `rating` SK, descending) — no scans. The
-  hot-partition caveat is noted in Project 1's data module.
+  (constant `entity = "PLAYER"` PK, `rating` SK, descending) — no scans.
 - **`VERSION` env var → `/version`.** The Dockerfile bakes in the git SHA at
   build time; `/version` returns it. This is the load-bearing chain that proves
   blue/green shifted traffic (and that rollback reverted it).
@@ -67,9 +66,7 @@ The pipeline artifacts live here so the app owns its own deploy contract:
 - **`appspec.yaml`** — the CodeDeploy ECS blue/green hook (container
   `skybound-api`, port `8080`).
 - **`taskdef.json`** — task definition template. CodeBuild replaces `<IMAGE>`;
-  the remaining `<...>` placeholders (role ARNs, per-env table names, log group,
-  region) are rendered by Project 2's pipeline. `skybound-api` / `8080` here
-  must stay in lockstep with `appspec.yaml` and the app SG.
+   `skybound-api` / `8080` here must stay in lockstep with `appspec.yaml` and the app SG.
 
 ## What I'd change for production
 

@@ -17,6 +17,7 @@ services:
       DYNAMODB_ENDPOINT_URL: http://dynamodb-local:8000
       PLAYERS_TABLE: dev-Players
       MATCHES_TABLE: dev-Matches
+      PYTHONPATH: /app
     entrypoint: ["python", "scripts/init_local_tables.py"]
 
   api:
@@ -25,7 +26,8 @@ services:
       args:
         VERSION: local-dev
     depends_on:
-      - init
+      init:
+        condition: service_completed_successfully
     environment:
       AWS_REGION: us-east-1
       DYNAMODB_ENDPOINT_URL: http://dynamodb-local:8000

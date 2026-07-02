@@ -21,3 +21,23 @@ module "data" {
   env          = var.env
   pitr_enabled = var.pitr_enabled
 }
+
+module "compute" {
+  source = "../../modules/compute"
+  env    = var.env
+  region = var.region
+
+  vpc_id             = module.network.vpc_id
+  public_subnet_ids  = module.network.public_subnet_ids
+  private_subnet_ids = module.network.private_subnet_ids
+  alb_sg_id          = module.security.alb_sg_id
+  app_sg_id          = module.security.app_sg_id
+
+  players_table_arn  = module.data.players_table_arn
+  matches_table_arn  = module.data.matches_table_arn
+  players_table_name = module.data.players_table_name
+  matches_table_name = module.data.matches_table_name
+
+  desired_count = var.app_desired_count
+  # certificate_arn left empty in dev → HTTP:80 listener (no ACM cert needed).
+}

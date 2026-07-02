@@ -38,7 +38,7 @@ module so launching the next title starts from a secure baseline.
 - **DynamoDB** tables provisioned in code (`Players` with a `leaderboard-index`
   GSI for top-N queries, and `Matches`) so the app never clicks them.
 
-> A rendered, environment-accurate version of this diagram lives in [`docs/architecture.md`](docs/architecture.md).
+> A rendered, environment-accurate version of this diagram lives in [`docs/architecture.md`](docs/architecture.png).
 
 ## Layout
 
@@ -51,9 +51,9 @@ modules/
 environments/
   dev/                Wires the modules with dev-sized values
   staging/  prod/     Same shape, different scale (proves repeatability)
-app/                  FastAPI backend (Project 2)
-pipeline/             CodePipeline + CodeBuild definitions (Project 2)
-buildspec-*.yml       CodeBuild specs (Project 2)
+app/                  FastAPI backend
+pipeline/             CodePipeline + CodeBuild definitions
+buildspec-*.yml       CodeBuild specs 
 ```
 
 ## Key decisions
