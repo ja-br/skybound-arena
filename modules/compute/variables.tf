@@ -63,9 +63,21 @@ variable "app_port" {
 }
 
 variable "container_name" {
-  description = "Container name. Must match appspec.yaml + taskdef.json (skybound-api)."
+  description = "Container name. Must match taskdef.json (skybound-api)."
   type        = string
   default     = "skybound-api"
+}
+
+variable "image_tag" {
+  description = "ECR image tag the task runs. Bump it (new build) to trigger a blue/green deploy."
+  type        = string
+  default     = "bootstrap"
+}
+
+variable "bake_time_minutes" {
+  description = "Minutes ECS keeps blue alive after the shift, for instant rollback."
+  type        = number
+  default     = 5
 }
 
 variable "cpu" {

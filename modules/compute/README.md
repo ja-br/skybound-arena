@@ -1,16 +1,32 @@
 # compute module
 
-The runtime the app runs on and the target the CI/CD pipeline
-deploys into: an ECR repo, an internet-facing ALB with two target groups
-(blue/green), a CloudWatch log group, scoped task/execution IAM roles, and a
-Fargate ECS service using the **CodeDeploy deployment controller**.
+The runtime the app runs on and the target the CI/CD pipeline deploys into: an
+ECR repo, an internet-facing ALB with two target groups (blue/green), a
+CloudWatch log group, scoped task/execution IAM roles, and a Fargate ECS service
+that performs **ECS-native blue/green deployments**.
 
+## How deploys work
 
-Terraform stands the service up once with a *bootstrap* task revision pointed at
-the **blue** target group. CodeDeploy owns every deploy after. it
-registers new task revisions and shifts the ALB listener between blue and green.
-So the service ignores drift on `task_definition`, `load_balancer`, and
-`desired_count`, and the listener ignores `default_action`. 
+The ECS service uses the built-in blue/green strategy
+(`deployment_configuration { strategy = "BLUE_GREEN" }`). A deployment is
+triggered by updating the service's **task definition** (new image). ECS then:
+
+1. Provisions the new version as a **green** task set alongside the live **blue**
+   one and registers it with the green target group.
+2. Optionally validates green against a **test listener rule** using lifecycle
+   hooks — the shift can be blocked until validation passes.
+3. Shifts production traffic by repointing the **production listener rule** from
+   blue to green.
+4. **Bakes** for `bake_time_in_minutes`, then drains and stops blue.
+5. **Auto-rolls back** to blue — no downtime — if a CloudWatch
+   `deployment_alarm` fires or the deployment circuit breaker trips.
+
+Traffic shifting is wired through ALB **listener rules**, and an **ECS
+infrastructure IAM role** (managed policy
+`AmazonECSInfrastructureRolePolicyForLoadBalancers`) grants ECS permission to
+modify the target groups and listener rules during a shift. Terraform owns the
+task definition — updating the image is the deploy — so there is no
+`ignore_changes` drift to reason about.
 
 ## Bootstrap sequence
 
@@ -33,9 +49,9 @@ terraform apply
 ```
 
 Then `curl http://$(terraform output -raw alb_dns_name)/healthz` — once it's
-`200`, the deploy target is live and app pipeline has somewhere to
-ship to. `/version` will read `bootstrap` until the first pipeline deploy stamps
-it with a git SHA.
+`200`, the deploy target is live and the app pipeline has somewhere to ship to.
+`/version` will read `bootstrap` until the first pipeline deploy stamps it with a
+git SHA.
 
 ## Dev vs prod
 

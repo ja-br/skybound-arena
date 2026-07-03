@@ -1,6 +1,6 @@
-# Most of these are consumed by the pipeline module: CodeBuild pushes
-# to the ECR repo, and the CodeDeploy deployment group targets the cluster,
-# service, both target groups, and the production listener.
+# Consumed by the (future) app pipeline: CodeBuild pushes to the ECR repo, and
+# the deploy stage updates the ECS service (cluster + service name) to register a
+# new task definition, which ECS rolls out via its native blue/green strategy.
 
 output "ecr_repository_url" {
   description = "ECR repo URL. Buildspec tags images here with the git SHA."
@@ -18,17 +18,17 @@ output "service_name" {
 }
 
 output "blue_target_group_name" {
-  description = "Blue target group name (CodeDeploy load balancer info)."
+  description = "Blue (initial production) target group name."
   value       = aws_lb_target_group.blue.name
 }
 
 output "green_target_group_name" {
-  description = "Green target group name (CodeDeploy load balancer info)."
+  description = "Green (alternate) target group name ECS shifts traffic to."
   value       = aws_lb_target_group.green.name
 }
 
 output "prod_listener_arn" {
-  description = "Production listener ARN CodeDeploy shifts traffic on."
+  description = "Production listener ARN (its rule is what ECS repoints on a shift)."
   value       = aws_lb_listener.prod.arn
 }
 

@@ -1,19 +1,20 @@
-# Compute module: the deploy target the CI/CD pipeline ships into.
+# Compute module: the runtime the app runs on and the deploy target.
 #
-#   players ─443/80─> ALB ─> [blue|green] target group ─> Fargate task (app_port)
+#   players ─443/80─> ALB ─(prod listener rule)─> [blue|green] target group ─> Fargate task (app_port)
 #
-# The ECS service uses the CODE_DEPLOY deployment controller: Terraform stands up
-# the service with a bootstrap task revision and the blue target group, then
-# CodeDeploy owns every subsequent blue/green traffic shift. 
+# The ECS service uses the built-in ECS blue/green strategy: updating the task
+# definition (new image) makes ECS stand up a green task set, validate it, shift
+# the production listener rule from blue to green, bake, then drain blue — with
+# automatic rollback via the deployment circuit breaker. No CodeDeploy.
 
 data "aws_caller_identity" "current" {}
 
 locals {
   name      = "${var.env}-skybound"
   use_https = var.certificate_arn != ""
-  # First image the service boots on. Push an app image tagged `bootstrap` to ECR
-  # before applying the service (see the module README). The pipeline replaces it.
-  bootstrap_image = "${aws_ecr_repository.app.repository_url}:bootstrap"
+  # Image the service runs. Defaults to the `bootstrap` tag pushed by hand on
+  # first bring-up (see README); set var.image_tag to a new tag to deploy.
+  container_image = "${aws_ecr_repository.app.repository_url}:${var.image_tag}"
 }
 
 # --- Image registry ----------------------------------------------------------
@@ -86,6 +87,27 @@ resource "aws_iam_role_policy" "task" {
   policy = data.aws_iam_policy_document.task.json
 }
 
+# --- IAM: ECS infrastructure role (lets ECS move the listener rule on a shift) -
+data "aws_iam_policy_document" "ecs_infra_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ecs.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ecs_infra" {
+  name               = "${local.name}-ecs-infra"
+  assume_role_policy = data.aws_iam_policy_document.ecs_infra_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_infra" {
+  role       = aws_iam_role.ecs_infra.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonECSInfrastructureRolePolicyForLoadBalancers"
+}
+
 # --- Load balancer + blue/green target groups --------------------------------
 resource "aws_lb" "this" {
   name               = "${local.name}-alb"
@@ -130,7 +152,9 @@ resource "aws_lb_target_group" "green" {
   }
 }
 
-# Production listener CodeDeploy shifts. HTTP:80 in dev; HTTPS:443 when a cert is set.
+# Production listener. HTTP:80 in dev; HTTPS:443 when a cert is set. The default
+# action is a 404 fallback — all real traffic is governed by the rule below,
+# which is the one ECS shifts between blue and green.
 resource "aws_lb_listener" "prod" {
   load_balancer_arn = aws_lb.this.arn
   port              = local.use_https ? 443 : 80
@@ -139,17 +163,38 @@ resource "aws_lb_listener" "prod" {
   certificate_arn   = local.use_https ? var.certificate_arn : null
 
   default_action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "no route"
+      status_code  = "404"
+    }
+  }
+}
+
+# The production listener rule ECS repoints on every blue/green shift. It starts
+# on blue; ECS rewrites its target group, so ignore drift on the action.
+resource "aws_lb_listener_rule" "prod" {
+  listener_arn = aws_lb_listener.prod.arn
+  priority     = 1
+
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.blue.arn
   }
 
-  # CodeDeploy rewrites default_action.target_group_arn on every shift.
+  condition {
+    path_pattern {
+      values = ["/*"]
+    }
+  }
+
   lifecycle {
-    ignore_changes = [default_action]
+    ignore_changes = [action]
   }
 }
 
-# --- ECS cluster + bootstrap task definition + service -----------------------
+# --- ECS cluster + task definition + service ---------------------------------
 resource "aws_ecs_cluster" "this" {
   name = "${local.name}-cluster"
 
@@ -159,7 +204,9 @@ resource "aws_ecs_cluster" "this" {
   }
 }
 
-# Bootstrap revision only, the pipeline's rendered taskdef.json supersedes it.
+# Terraform owns this. Bumping var.image_tag registers a new revision, which is
+# what triggers a blue/green deployment. VERSION is echoed by /version to prove
+# which build is live after a shift (or rollback).
 resource "aws_ecs_task_definition" "app" {
   family                   = var.container_name
   network_mode             = "awsvpc"
@@ -172,7 +219,7 @@ resource "aws_ecs_task_definition" "app" {
   container_definitions = jsonencode([
     {
       name      = var.container_name
-      image     = local.bootstrap_image
+      image     = local.container_image
       essential = true
       portMappings = [
         { containerPort = var.app_port, protocol = "tcp" }
@@ -181,7 +228,7 @@ resource "aws_ecs_task_definition" "app" {
         { name = "AWS_REGION", value = var.region },
         { name = "PLAYERS_TABLE", value = var.players_table_name },
         { name = "MATCHES_TABLE", value = var.matches_table_name },
-        { name = "VERSION", value = "bootstrap" },
+        { name = "VERSION", value = var.image_tag },
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -193,11 +240,6 @@ resource "aws_ecs_task_definition" "app" {
       }
     }
   ])
-
-  # The pipeline manages task revisions ignore drift after bootstrap.
-  lifecycle {
-    ignore_changes = [container_definitions]
-  }
 }
 
 resource "aws_ecs_service" "app" {
@@ -207,8 +249,17 @@ resource "aws_ecs_service" "app" {
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
 
-  deployment_controller {
-    type = "CODE_DEPLOY"
+  # Built-in blue/green: green stands up, validates, traffic shifts, bakes.
+  deployment_configuration {
+    strategy             = "BLUE_GREEN"
+    bake_time_in_minutes = var.bake_time_minutes
+  }
+
+  # Auto-rollback if the deployment can't stabilise (e.g. a broken build fails
+  # health checks) — the "push a bad build, watch it roll back" demo.
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
   }
 
   network_configuration {
@@ -217,19 +268,25 @@ resource "aws_ecs_service" "app" {
     assign_public_ip = false
   }
 
+  # target_group_arn is the current production (blue) target group; ECS shifts
+  # traffic to the alternate (green) group via the production listener rule.
   load_balancer {
     target_group_arn = aws_lb_target_group.blue.arn
     container_name   = var.container_name
     container_port   = var.app_port
+
+    advanced_configuration {
+      alternate_target_group_arn = aws_lb_target_group.green.arn
+      production_listener_rule   = aws_lb_listener_rule.prod.arn
+      role_arn                   = aws_iam_role.ecs_infra.arn
+    }
   }
 
   # Don't block apply on health while bootstrapping before the first real deploy.
   wait_for_steady_state = false
 
-  # CodeDeploy owns these after bootstrap Terraform must not revert its shifts.
-  lifecycle {
-    ignore_changes = [task_definition, load_balancer, desired_count]
-  }
-
-  depends_on = [aws_lb_listener.prod]
+  depends_on = [
+    aws_lb_listener_rule.prod,
+    aws_iam_role_policy_attachment.ecs_infra,
+  ]
 }
