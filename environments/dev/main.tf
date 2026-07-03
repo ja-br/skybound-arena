@@ -41,3 +41,19 @@ module "compute" {
   desired_count = var.app_desired_count
   # certificate_arn left empty in dev → HTTP:80 listener (no ACM cert needed).
 }
+
+module "pipeline" {
+  source = "../../modules/pipeline"
+  env    = var.env
+  region = var.region
+
+  github_repository = var.github_repository
+  github_branch     = var.github_branch
+
+  ecr_repository_url      = module.compute.ecr_repository_url
+  ecr_repository_arn      = module.compute.ecr_repository_arn
+  ecs_cluster_name        = module.compute.cluster_name
+  ecs_service_name        = module.compute.service_name
+  task_execution_role_arn = module.compute.task_execution_role_arn
+  task_role_arn           = module.compute.task_role_arn
+}

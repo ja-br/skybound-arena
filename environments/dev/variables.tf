@@ -47,3 +47,16 @@ variable "app_desired_count" {
   type        = number
   default     = 1
 }
+
+# --- CI/CD pipeline ----------------------------------------------------------
+variable "github_repository" {
+  description = "GitHub repo the pipelines build from, as owner/name."
+  type        = string
+  default     = "ja-br/skybound-arena"
+}
+
+variable "github_branch" {
+  description = "Branch the pipelines track."
+  type        = string
+  default     = "main"
+}

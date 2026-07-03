@@ -9,7 +9,7 @@ and ELO leaderboards under a "streamer spike" load test.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET  | `/healthz` | Liveness for the ALB target group + CodeDeploy health check. Blue/green relies on it. |
+| GET  | `/healthz` | Liveness for the ALB target group; the blue/green shift gates on it. |
 | GET  | `/version` | Echoes the build's git SHA (injected by the pipeline). The proof traffic shifted. |
 | POST | `/players` | Create a player (`{"username": "..."}`). Starts at rating 1000. |
 | GET  | `/players/{player_id}` | Fetch a profile. |
@@ -60,13 +60,14 @@ python -m pytest tests          # ELO math + /healthz + /version
 The CI buildspec runs `pytest app/tests` before building the image.
 
 
-The pipeline artifacts live here so the app owns its own deploy contract:
+The app owns its own deploy contract:
 
 - **`Dockerfile`** — build context is `app/`; takes `--build-arg VERSION=<sha>`.
-- **`appspec.yaml`** — the CodeDeploy ECS blue/green hook (container
-  `skybound-api`, port `8080`).
-- **`taskdef.json`** — task definition template. CodeBuild replaces `<IMAGE>`;
-   `skybound-api` / `8080` here must stay in lockstep with `appspec.yaml` and the app SG.
+  Container name `skybound-api` and port `8080` must stay in lockstep with the
+  compute module's task definition and the app SG. The pipeline's deploy stage
+  rebuilds the task-def revision from the live one (`aws ecs
+  describe-task-definition`), swapping the image and `VERSION` — there is no
+  separate task-def file to keep in sync.
 
 ## What I'd change for production
 

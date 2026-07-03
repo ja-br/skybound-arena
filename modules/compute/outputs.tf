@@ -7,13 +7,18 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.app.repository_url
 }
 
+output "ecr_repository_arn" {
+  description = "ECR repo ARN. Scopes the pipeline's image-push permissions."
+  value       = aws_ecr_repository.app.arn
+}
+
 output "cluster_name" {
-  description = "ECS cluster name (CodeDeploy deployment group target)."
+  description = "ECS cluster name (the app pipeline's deploy target)."
   value       = aws_ecs_cluster.this.name
 }
 
 output "service_name" {
-  description = "ECS service name (CodeDeploy deployment group target)."
+  description = "ECS service name (the app pipeline updates it to deploy)."
   value       = aws_ecs_service.app.name
 }
 
@@ -33,17 +38,17 @@ output "prod_listener_arn" {
 }
 
 output "task_execution_role_arn" {
-  description = "Task execution role ARN. Fills <EXECUTION_ROLE_ARN> in taskdef.json."
+  description = "Task execution role ARN (the pipeline deploy role passes it on register-task-definition)."
   value       = aws_iam_role.execution.arn
 }
 
 output "task_role_arn" {
-  description = "Task role ARN. Fills <TASK_ROLE_ARN> in taskdef.json."
+  description = "Task role ARN (the pipeline deploy role passes it on register-task-definition)."
   value       = aws_iam_role.task.arn
 }
 
 output "log_group_name" {
-  description = "App log group. Fills <LOG_GROUP> in taskdef.json."
+  description = "App log group name."
   value       = aws_cloudwatch_log_group.app.name
 }
 

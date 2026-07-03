@@ -12,26 +12,26 @@ output "alb_dns_name" {
 
 output "ecs_cluster_name" {
   value       = module.compute.cluster_name
-  description = "ECS cluster (CodeDeploy target)."
+  description = "ECS cluster (the app pipeline's deploy target)."
 }
 
 output "ecs_service_name" {
   value       = module.compute.service_name
-  description = "ECS service (CodeDeploy target)."
+  description = "ECS service (the app pipeline updates it to deploy)."
 }
 
-# taskdef.json placeholder fills — the buildspec renders these into the artifact.
+# Passed into the pipeline module for the deploy stage (PassRole + logging).
 output "task_execution_role_arn" {
   value       = module.compute.task_execution_role_arn
-  description = "Fills <EXECUTION_ROLE_ARN> in taskdef.json."
+  description = "Task execution role ARN (deploy stage passes it on register-task-definition)."
 }
 
 output "task_role_arn" {
   value       = module.compute.task_role_arn
-  description = "Fills <TASK_ROLE_ARN> in taskdef.json."
+  description = "Task role ARN (deploy stage passes it on register-task-definition)."
 }
 
 output "log_group_name" {
   value       = module.compute.log_group_name
-  description = "Fills <LOG_GROUP> in taskdef.json."
+  description = "App log group name."
 }

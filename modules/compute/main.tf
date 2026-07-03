@@ -117,7 +117,7 @@ resource "aws_lb" "this" {
   subnets            = var.public_subnet_ids
 }
 
-# Two target groups CodeDeploy swaps between. target_type = ip for awsvpc/Fargate.
+# Two target groups ECS swaps between during a blue/green shift. target_type = ip for awsvpc/Fargate.
 resource "aws_lb_target_group" "blue" {
   name        = "${local.name}-blue"
   port        = var.app_port
@@ -284,6 +284,12 @@ resource "aws_ecs_service" "app" {
 
   # Don't block apply on health while bootstrapping before the first real deploy.
   wait_for_steady_state = false
+
+  # The pipeline registers new task-def revisions and deploys them; don't revert
+  # the live revision on apply.
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 
   depends_on = [
     aws_lb_listener_rule.prod,

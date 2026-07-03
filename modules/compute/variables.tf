@@ -57,13 +57,13 @@ variable "matches_table_name" {
 
 # --- App runtime knobs -------------------------------------------------------
 variable "app_port" {
-  description = "Container port the app listens on. Must match the app SG + appspec."
+  description = "Container port the app listens on. Must match the app SG + Dockerfile."
   type        = number
   default     = 8080
 }
 
 variable "container_name" {
-  description = "Container name. Must match taskdef.json (skybound-api)."
+  description = "Container name (skybound-api). Must match the Dockerfile and the pipeline deploy filter."
   type        = string
   default     = "skybound-api"
 }
@@ -93,13 +93,13 @@ variable "memory" {
 }
 
 variable "desired_count" {
-  description = "Number of tasks. CodeDeploy manages this after bootstrap."
+  description = "Number of tasks (static; no autoscaling)."
   type        = number
   default     = 1
 }
 
 variable "health_check_path" {
-  description = "ALB target-group health check path. Load-bearing: CodeDeploy gates on it."
+  description = "ALB target-group health check path. Load-bearing: the blue/green shift gates on it."
   type        = string
   default     = "/healthz"
 }

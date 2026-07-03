@@ -38,22 +38,22 @@ module so launching the next title starts from a secure baseline.
 - **DynamoDB** tables provisioned in code (`Players` with a `leaderboard-index`
   GSI for top-N queries, and `Matches`) so the app never clicks them.
 
-> A rendered, environment-accurate version of this diagram lives in [`docs/architecture.md`](docs/architecture.png).
+> A rendered, environment-accurate version of this diagram lives in [`docs/architecture.png`](docs/architecture.png).
 
 ## Layout
 
 ```
-bootstrap/            One-time: S3 state bucket + DynamoDB lock table
+bootstrap/            One-time: S3 state bucket (native lockfile locking)
 modules/
   network/            VPC, subnets, IGW, NAT, route tables
   security/           ALB SG + app SG (ALB-only ingress)
   data/               DynamoDB Players (+ GSI) and Matches tables
+  compute/            ECR, ALB, ECS/Fargate service (native blue/green)
+  pipeline/           CodePipeline + CodeBuild (buildspecs inline)
 environments/
   dev/                Wires the modules with dev-sized values
   staging/  prod/     Same shape, different scale (proves repeatability)
 app/                  FastAPI backend
-pipeline/             CodePipeline + CodeBuild definitions
-buildspec-*.yml       CodeBuild specs 
 ```
 
 ## Key decisions
@@ -71,7 +71,7 @@ buildspec-*.yml       CodeBuild specs
 
 ## Deploy
 
-**Prerequisites:** Terraform >= 1.5, AWS credentials configured
+**Prerequisites:** Terraform >= 1.10, AWS credentials configured
 (`aws configure` / SSO), permission to create VPC + DynamoDB + S3 resources
 
 **1. Bootstrap the state backend (once per account):**
@@ -80,23 +80,20 @@ buildspec-*.yml       CodeBuild specs
 cd bootstrap
 terraform init
 terraform apply
-terraform output            # note state_bucket and lock_table
+terraform output            # note the state_bucket name
 ```
 
-**2. Point the dev backend at that bucket.** Edit
-`environments/dev/backend.tf` and replace `<ACCOUNT_ID>` with your account ID
-(the `state_bucket` output is `skybound-tfstate-<ACCOUNT_ID>`)
-
-**3. Stand up dev:**
+**2. Stand up dev.** The state bucket is account-specific, so it's passed at
+`init` — nothing account-specific is committed to the repo:
 
 ```bash
 cd environments/dev
-terraform init
+terraform init -backend-config="bucket=skybound-tfstate-$(aws sts get-caller-identity --query Account --output text)"
 terraform plan
 terraform apply
 ```
 
-Standing up `staging` or `prod` is the same three commands in their directory
+Standing up `staging` or `prod` is the same commands in their directory
 
 ## Considered change for production
 

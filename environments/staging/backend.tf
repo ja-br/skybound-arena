@@ -2,7 +2,8 @@
 
 terraform {
   backend "s3" {
-    bucket       = "skybound-tfstate-680458886009"
+    # bucket is account-specific — passed at init:
+    #   -backend-config="bucket=skybound-tfstate-<ACCOUNT_ID>"
     key          = "env/staging/terraform.tfstate"
     region       = "us-east-1"
     use_lockfile = true

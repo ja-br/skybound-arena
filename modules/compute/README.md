@@ -25,8 +25,9 @@ Traffic shifting is wired through ALB **listener rules**, and an **ECS
 infrastructure IAM role** (managed policy
 `AmazonECSInfrastructureRolePolicyForLoadBalancers`) grants ECS permission to
 modify the target groups and listener rules during a shift. Terraform owns the
-task definition — updating the image is the deploy — so there is no
-`ignore_changes` drift to reason about.
+task-def template and the bootstrap revision; the app pipeline owns the running
+revision, so the service sets `ignore_changes = [task_definition]` to keep an
+apply from reverting the pipeline's live deploy.
 
 ## Bootstrap sequence
 
