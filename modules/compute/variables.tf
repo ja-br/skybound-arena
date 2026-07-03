@@ -110,6 +110,12 @@ variable "log_retention_days" {
   default     = 14
 }
 
+variable "metrics_namespace" {
+  description = "CloudWatch namespace for the app's EMF metrics. Injected into the container and re-exported for the observability dashboard so the two can't drift."
+  type        = string
+  default     = "Skybound/GameApp"
+}
+
 variable "certificate_arn" {
   description = "ACM cert ARN. Empty = HTTP:80 listener (dev); set = HTTPS:443 (prod)."
   type        = string

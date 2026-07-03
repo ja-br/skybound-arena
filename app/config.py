@@ -16,5 +16,13 @@ class Settings:
     # Set to http://dynamodb-local:8000 for local docker-compose runs; unset in AWS.
     dynamodb_endpoint: str | None = os.environ.get("DYNAMODB_ENDPOINT_URL") or None
 
+    # Observability. Namespace/service/env become CloudWatch metric dimensions;
+    # the compute task definition injects the same values so the app's emitted
+    # metrics and the dashboard's references can't drift.
+    metrics_namespace: str = os.environ.get("METRICS_NAMESPACE", "Skybound/GameApp")
+    service_name: str = os.environ.get("SERVICE_NAME", "skybound-api")
+    env_name: str = os.environ.get("ENV", "dev")
+    metrics_enabled: bool = os.environ.get("METRICS_ENABLED", "true").lower() != "false"
+
 
 settings = Settings()

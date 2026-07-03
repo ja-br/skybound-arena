@@ -1,16 +1,20 @@
 """Skybound Arena backend API: 8 endpoints (2 meta, 2 player, 2 matchmaking,
 1 result, 1 leaderboard)."""
 
+import logging
+import time
 import uuid
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 
 from config import settings
 from db import matches_table, players_table
 from elo import updated_ratings
+from logging_config import configure_logging
 from matchmaking import matchmaker
+from metrics import emit
 from models import (
     CreatePlayer,
     LeaderboardEntry,
@@ -21,9 +25,64 @@ from models import (
     Ticket,
 )
 
+configure_logging()
+_log = logging.getLogger("skybound.api")
+
 app = FastAPI(title="Skybound Arena", version=settings.version)
 
 STARTING_RATING = 1000
+
+# Health/meta paths are excluded from metric emission: /healthz is hit by the
+# ALB every 30s across two target groups, so metering it is pure noise + cost.
+_UNMETERED_PATHS = {"/healthz", "/version"}
+
+
+@app.middleware("http")
+async def observe(request: Request, call_next):
+    """Per-request access log + RequestCount / HttpErrorCount metrics."""
+    request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
+    start = time.perf_counter()
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        response.headers["x-request-id"] = request_id
+        return response
+    except Exception:
+        # An unhandled error propagates *through* this middleware, so anything
+        # after call_next only runs via `finally`. Count it as a 5xx, re-raise.
+        status = 500
+        raise
+    finally:
+        duration_ms = round((time.perf_counter() - start) * 1000, 2)
+        if request.url.path not in _UNMETERED_PATHS:
+            # Route TEMPLATE, never the raw path — a per-path-param dimension
+            # (e.g. /players/{id}) would create one custom metric per value.
+            # scope["route"] is set by the router (after call_next) and is
+            # absent for a request that matched no route.
+            route = request.scope.get("route")
+            route_path = getattr(route, "path", None) or "unmatched"
+            # RequestCount/HttpErrorCount aggregate at service/env so the
+            # dashboard can derive a clean error rate; route + status class ride
+            # along as log fields (not dimensions) to stay cardinality-safe.
+            metrics = {"RequestCount": 1}
+            units = {"RequestCount": "Count"}
+            fields = {"route": route_path}
+            if status >= 400:
+                metrics["HttpErrorCount"] = 1
+                units["HttpErrorCount"] = "Count"
+                fields["status_class"] = f"{status // 100}xx"
+            emit(metrics, units, fields=fields)
+        _log.info(
+            "request",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status": status,
+                "duration_ms": duration_ms,
+            },
+        )
 
 
 def _now() -> str:
@@ -80,6 +139,8 @@ def create_player(body: CreatePlayer):
         "created_at": _now(),
     }
     players_table().put_item(Item=item)
+    emit({"PlayersCreated": 1}, {"PlayersCreated": "Count"})
+    _log.info("player_created", extra={"player_id": player_id})
     return _to_player(item)
 
 
@@ -111,6 +172,18 @@ def _create_match(player_a: str, player_b: str) -> str:
 def join_queue(body: QueueRequest):
     _load_player(body.player_id)  # 404 if the player doesn't exist
     ticket = matchmaker.queue(body.player_id, _create_match)
+
+    outcome = ticket["status"]  # QUEUED | MATCHED
+    metrics = {"MatchmakingQueueDepth": matchmaker.depth()}
+    units = {"MatchmakingQueueDepth": "Count"}
+    if outcome == "MATCHED":
+        metrics["MatchesMade"] = 1
+        units["MatchesMade"] = "Count"
+        if ticket.get("wait_ms") is not None:
+            metrics["MatchmakingLatencyMs"] = ticket["wait_ms"]
+            units["MatchmakingLatencyMs"] = "Milliseconds"
+    emit(metrics, units)
+    _log.info("matchmaking", extra={"player_id": body.player_id, "outcome": outcome})
     return Ticket(**ticket)
 
 
@@ -153,6 +226,8 @@ def report_result(match_id: str, body: ResultRequest):
         ExpressionAttributeValues={":complete": "COMPLETE", ":w": body.winner},
     )
 
+    emit({"MatchCompleted": 1}, {"MatchCompleted": "Count"})
+    _log.info("match_completed", extra={"match_id": match_id, "player_id": body.winner})
     return MatchResult(
         match_id=match_id,
         status="COMPLETE",
@@ -175,11 +250,16 @@ def _apply_result(player_id: str, new_rating: int, won: bool) -> None:
 
 @app.get("/leaderboard", response_model=list[LeaderboardEntry])
 def leaderboard(limit: int = Query(default=10, ge=1, le=100)):
+    start = time.perf_counter()
     resp = players_table().query(
         IndexName="leaderboard-index",
         KeyConditionExpression=Key("entity").eq("PLAYER"),
         ScanIndexForward=False,  # highest rating first
         Limit=limit,
+    )
+    emit(
+        {"LeaderboardQueryMs": round((time.perf_counter() - start) * 1000, 2)},
+        {"LeaderboardQueryMs": "Milliseconds"},
     )
     return [
         LeaderboardEntry(username=i["username"], rating=int(i["rating"]))

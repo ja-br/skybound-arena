@@ -42,6 +42,20 @@ module "compute" {
   # certificate_arn left empty in dev → HTTP:80 listener (no ACM cert needed).
 }
 
+module "observability" {
+  source = "../../modules/observability"
+  env    = var.env
+  region = var.region
+
+  cluster_name   = module.compute.cluster_name
+  service_name   = module.compute.service_name
+  alb_arn_suffix = module.compute.alb_arn_suffix
+
+  # From compute so the dashboard's metric references match what the app emits.
+  metrics_namespace = module.compute.metrics_namespace
+  metrics_service   = module.compute.metrics_service
+}
+
 module "pipeline" {
   source = "../../modules/pipeline"
   env    = var.env

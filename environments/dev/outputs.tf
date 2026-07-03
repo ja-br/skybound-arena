@@ -35,3 +35,8 @@ output "log_group_name" {
   value       = module.compute.log_group_name
   description = "App log group name."
 }
+
+output "dashboard_url" {
+  value       = module.observability.dashboard_url
+  description = "CloudWatch live-ops dashboard (the demo/README screenshot)."
+}

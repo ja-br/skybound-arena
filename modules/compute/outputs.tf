@@ -56,3 +56,32 @@ output "alb_dns_name" {
   description = "Public ALB hostname — curl /healthz and /version here."
   value       = aws_lb.this.dns_name
 }
+
+# --- Observability inputs ----------------------------------------------------
+# CloudWatch dimensions the dashboard keys off. ALB/target-group metrics are
+# dimensioned by arn_suffix, not name or ARN.
+
+output "alb_arn_suffix" {
+  description = "ALB ARN suffix — the CloudWatch LoadBalancer dimension."
+  value       = aws_lb.this.arn_suffix
+}
+
+output "blue_target_group_arn_suffix" {
+  description = "Blue target-group ARN suffix (TargetGroup dimension). Not consumed yet; ALB widgets use the LoadBalancer dimension, stable across a blue/green shift."
+  value       = aws_lb_target_group.blue.arn_suffix
+}
+
+output "green_target_group_arn_suffix" {
+  description = "Green target-group ARN suffix (TargetGroup dimension). Not consumed yet."
+  value       = aws_lb_target_group.green.arn_suffix
+}
+
+output "metrics_namespace" {
+  description = "EMF namespace injected into the container — the dashboard reads it here so app + dashboard can't drift."
+  value       = var.metrics_namespace
+}
+
+output "metrics_service" {
+  description = "The `service` dimension value (the container name) the app tags metrics with."
+  value       = var.container_name
+}

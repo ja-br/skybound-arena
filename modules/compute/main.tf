@@ -229,6 +229,10 @@ resource "aws_ecs_task_definition" "app" {
         { name = "PLAYERS_TABLE", value = var.players_table_name },
         { name = "MATCHES_TABLE", value = var.matches_table_name },
         { name = "VERSION", value = var.image_tag },
+        # Observability: the dashboard reads these same values (via outputs).
+        { name = "METRICS_NAMESPACE", value = var.metrics_namespace },
+        { name = "SERVICE_NAME", value = var.container_name },
+        { name = "ENV", value = var.env },
       ]
       logConfiguration = {
         logDriver = "awslogs"
