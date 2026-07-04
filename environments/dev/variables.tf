@@ -60,3 +60,10 @@ variable "github_branch" {
   type        = string
   default     = "main"
 }
+
+# --- Observability / auto-heal -----------------------------------------------
+variable "notification_email" {
+  description = "Email subscribed to the alerts SNS topic. Empty = no subscription."
+  type        = string
+  default     = ""
+}

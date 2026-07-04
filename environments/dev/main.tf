@@ -56,6 +56,24 @@ module "observability" {
   metrics_service   = module.compute.metrics_service
 }
 
+module "autoheal" {
+  source = "../../modules/autoheal"
+  env    = var.env
+  region = var.region
+
+  cluster_name                  = module.compute.cluster_name
+  service_name                  = module.compute.service_name
+  alb_arn_suffix                = module.compute.alb_arn_suffix
+  blue_target_group_arn_suffix  = module.compute.blue_target_group_arn_suffix
+  green_target_group_arn_suffix = module.compute.green_target_group_arn_suffix
+
+  # From compute so the alarms' metric references match what the app emits.
+  metrics_namespace = module.compute.metrics_namespace
+  metrics_service   = module.compute.metrics_service
+
+  notification_email = var.notification_email
+}
+
 module "pipeline" {
   source = "../../modules/pipeline"
   env    = var.env

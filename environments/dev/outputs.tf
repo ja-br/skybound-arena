@@ -40,3 +40,13 @@ output "dashboard_url" {
   value       = module.observability.dashboard_url
   description = "CloudWatch live-ops dashboard (the demo/README screenshot)."
 }
+
+output "sns_topic_arn" {
+  value       = module.autoheal.sns_topic_arn
+  description = "Alerts SNS topic (subscribe more endpoints here)."
+}
+
+output "remediate_lambda_name" {
+  value       = module.autoheal.remediate_lambda_name
+  description = "Auto-heal remediation Lambda (tail its logs to see heal actions)."
+}

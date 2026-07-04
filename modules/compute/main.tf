@@ -4,9 +4,8 @@
 #
 # The ECS service uses the built-in ECS blue/green strategy: updating the task
 # definition (new image) makes ECS stand up a green task set, validate it, shift
-# the production listener rule from blue to green, bake, then drain blue — with
-# automatic rollback via the deployment circuit breaker. No CodeDeploy.
-
+# the production listener rule from blue to green, bake, then drain blue, with
+# automatic rollback via the deployment circuit breaker.
 data "aws_caller_identity" "current" {}
 
 locals {
@@ -264,6 +263,16 @@ resource "aws_ecs_service" "app" {
   deployment_circuit_breaker {
     enable   = true
     rollback = true
+  }
+
+  # Metric-alarm rollback: the circuit breaker catches unhealthy tasks; this catches
+  # a deploy that goes healthy and *then* spikes 5xx. Top-level block (not nested in
+  # deployment_configuration) — ECS rolls green back to blue if this alarm fires
+  # during the shift. Alarm defined in alarms.tf.
+  alarms {
+    alarm_names = [aws_cloudwatch_metric_alarm.deploy_5xx.alarm_name]
+    enable      = true
+    rollback    = true
   }
 
   network_configuration {

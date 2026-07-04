@@ -8,3 +8,6 @@ private_subnet_cidrs = ["10.10.11.0/24", "10.10.12.0/24"]
 
 nat_gateway_count = 1 # single NAT in dev
 pitr_enabled      = false
+
+# Alerts: set to receive alarm emails (confirm the SNS link AWS sends). Empty = none.
+notification_email = "jbrooks.ak@gmail.com"

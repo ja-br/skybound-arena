@@ -14,6 +14,9 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+# Lambda build artifacts (archive_file regenerates these)
+**/lambda/*.zip
+
 # Secrets / local
 .env
 *.pem

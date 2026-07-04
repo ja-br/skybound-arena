@@ -121,3 +121,22 @@ variable "certificate_arn" {
   type        = string
   default     = ""
 }
+
+# --- Deploy-rollback alarm (feeds the service's blue/green alarms{} block) ----
+variable "deploy_alarm_5xx_threshold" {
+  description = "Target 5xx count over one period that trips a blue/green rollback."
+  type        = number
+  default     = 5
+}
+
+variable "deploy_alarm_period" {
+  description = "Evaluation period (seconds) for the deploy-rollback 5xx alarm."
+  type        = number
+  default     = 60
+}
+
+variable "deploy_alarm_eval_periods" {
+  description = "Consecutive breaching periods before the deploy-rollback alarm fires."
+  type        = number
+  default     = 1
+}
