@@ -64,9 +64,11 @@ resource "aws_lambda_function" "remediate" {
   source_code_hash = data.archive_file.remediate.output_base64sha256
   timeout          = 30
 
-  # Serialize invocations: if both heal alarms fire at once, the second waits and
-  # then sees the first's deployment in progress (cooldown guard) instead of racing.
-  reserved_concurrent_executions = 1
+  # No reserved_concurrent_executions: this account's total concurrency is 10 and AWS
+  # forbids dropping unreserved below 10, so any reservation is rejected. The cooldown
+  # guard in remediate.py is the real protection against racing redeploys; reserved=1
+  # was only belt-and-suspenders. Residual risk: two heal alarms firing in the same
+  # sub-second window could both pass the guard → at worst one redundant redeploy.
 
   environment {
     variables = {

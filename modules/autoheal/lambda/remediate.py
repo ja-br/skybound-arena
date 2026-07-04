@@ -15,8 +15,11 @@ store needed):
   1. If a deployment is already rolling out, skip — one is already fixing things.
   2. If the last deployment started within HEAL_COOLDOWN_SECONDS, skip — give it
      time to take effect before piling on another.
-Only when neither holds do we force a new deployment. Paired with the function's
-reserved concurrency of 1, two alarms firing at once can't race into two redeploys.
+Only when neither holds do we force a new deployment. Two alarms firing in the same
+sub-second window could both pass the guard and each force a deploy (at worst one
+redundant redeploy); the guard makes every subsequent edge a no-op once a deployment
+is in flight. (A reserved-concurrency of 1 would serialize these, but this account's
+concurrency limit forbids any reservation — see heal.tf.)
 """
 
 import logging

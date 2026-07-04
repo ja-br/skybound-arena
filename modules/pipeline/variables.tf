@@ -31,7 +31,12 @@ variable "tf_working_dir" {
 variable "tf_version" {
   description = "Terraform version the CodeBuild infra projects install."
   type        = string
-  default     = "1.9.5"
+  default     = "1.10.5"
+}
+
+variable "state_bucket" {
+  description = "S3 bucket holding remote state. Injected into `terraform init -backend-config` in CodeBuild, since backend.tf omits the account-specific bucket name."
+  type        = string
 }
 
 # --- App pipeline (from the compute module) ----------------------------------

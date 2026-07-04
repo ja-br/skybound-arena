@@ -53,9 +53,11 @@ loop for the recover-by-recycling case.
   flapping alarm would otherwise force a redeploy each time and never let the service
   settle. Before healing, the Lambda reads the service's own deployment state (no
   external store) and skips if a deployment is already rolling out or the last one
-  started within `heal_cooldown_seconds` (default 300s, ≥ the bake time). Reserved
-  concurrency of 1 serializes simultaneous alarms so they can't race into two
-  redeploys. This is why the Lambda now needs `ecs:DescribeServices`.
+  started within `heal_cooldown_seconds` (default 300s, ≥ the bake time). This is why
+  the Lambda now needs `ecs:DescribeServices`. (Reserved concurrency of 1 would also
+  serialize simultaneous alarms, but this account's Lambda concurrency limit is 10 and
+  AWS forbids reserving below the unreserved floor of 10 — so the cooldown guard alone
+  carries it; worst case is one redundant redeploy from two alarms firing at once.)
 
 ## How to deploy
 

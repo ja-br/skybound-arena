@@ -96,7 +96,8 @@ data "aws_iam_policy_document" "codebuild_infra" {
     actions = [
       "ec2:*", "ecs:*", "elasticloadbalancing:*", "dynamodb:*", "ecr:*",
       "logs:*", "iam:*", "s3:*", "cloudwatch:*", "application-autoscaling:*",
-      "sns:*", "codebuild:*", "codepipeline:*", "codestar-connections:*",
+      "sns:*", "lambda:*", "events:*", "codebuild:*", "codepipeline:*",
+      "codestar-connections:*",
     ]
     resources = ["*"]
   }

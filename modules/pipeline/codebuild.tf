@@ -19,7 +19,7 @@ locals {
       build:
         commands:
           - cd ${var.tf_working_dir}
-          - terraform init
+          - terraform init -backend-config="bucket=$STATE_BUCKET"
           - terraform fmt -check
           - terraform validate
           - terraform plan -out=tfplan
@@ -38,7 +38,7 @@ locals {
       build:
         commands:
           - cd ${var.tf_working_dir}
-          - terraform init
+          - terraform init -backend-config="bucket=$STATE_BUCKET"
           - terraform apply -auto-approve tfplan
   YAML
 }
@@ -54,6 +54,11 @@ resource "aws_codebuild_project" "tf_plan" {
     image           = local.codebuild_image
     type            = "LINUX_CONTAINER"
     privileged_mode = false
+
+    environment_variable {
+      name  = "STATE_BUCKET"
+      value = var.state_bucket
+    }
   }
 
   source {
@@ -73,6 +78,11 @@ resource "aws_codebuild_project" "tf_apply" {
     image           = local.codebuild_image
     type            = "LINUX_CONTAINER"
     privileged_mode = false
+
+    environment_variable {
+      name  = "STATE_BUCKET"
+      value = var.state_bucket
+    }
   }
 
   source {

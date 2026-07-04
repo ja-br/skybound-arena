@@ -1,5 +1,21 @@
 # dev environment: wires the shared modules with dev-sized values.
 
+# The remote-state bucket is `skybound-tfstate-<ACCOUNT_ID>` (created in bootstrap).
+# backend.tf can't reference variables, so the account ID stays out of source here and
+# the bucket is passed to `init` at runtime — locally via -backend-config, and into the
+# pipeline via this value. Construct it without hardcoding the account ID.
+
+locals {
+  state_bucket = "skybound-tfstate-${data.aws_caller_identity.current.account_id}"
+}
+
+data "aws_caller_identity" "current" {}
+
+output "account_id" {
+  value = data.aws_caller_identity.current.account_id
+}
+
+
 module "network" {
   source               = "../../modules/network"
   env                  = var.env
@@ -81,6 +97,7 @@ module "pipeline" {
 
   github_repository = var.github_repository
   github_branch     = var.github_branch
+  state_bucket      = local.state_bucket
 
   ecr_repository_url      = module.compute.ecr_repository_url
   ecr_repository_arn      = module.compute.ecr_repository_arn
