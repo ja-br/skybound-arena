@@ -29,6 +29,31 @@ task-def template and the bootstrap revision; the app pipeline owns the running
 revision, so the service sets `ignore_changes = [task_definition]` to keep an
 apply from reverting the pipeline's live deploy.
 
+## Auto-scaling
+
+The service scales on **ECS service CPU** via a target-tracking policy
+(`autoscaling.tf`): hold average CPU at `cpu_target_value` (60% in dev), between
+`min_capacity` and `max_capacity` (1–4 in dev). Scale-out cooldown is short (60s)
+and scale-in long (300s) — react fast to a spike, retreat slowly to avoid flapping.
+
+- **Why CPU, not request-count or queue depth.** CPU (`AWS/ECS CPUUtilization`) is
+  dimensioned by cluster/service, so it is **stable across a blue/green shift**.
+  `ALBRequestCountPerTarget` binds to a target-group resource label that ECS swaps on
+  every deploy (AWS documents it as unsupported for blue/green), and the custom
+  `MatchmakingQueueDepth` is an in-memory, per-task, sampled signal — misleading in
+  aggregate. Queue-depth scaling is the documented next step once matchmaking moves
+  out of process.
+- **`ignore_changes = [desired_count]`.** Once a scaling policy is active,
+  Application Auto Scaling owns `desiredCount`; Terraform must not also track it or an
+  apply would snap a scaled-out service back to the floor. `desired_count` is only the
+  initial/floor value at first apply.
+- **Service-linked role.** Application Auto Scaling auto-creates
+  `AWSServiceRoleForApplicationAutoScaling_ECSService` on the first
+  `RegisterScalableTarget` — nothing to author here, but the principal running the
+  first `terraform apply` needs `iam:CreateServiceLinkedRole`.
+
+Drive real load with the k6 spike test in `../../app/load/` to watch it scale out.
+
 ## Bootstrap sequence
 
 The ECR repo is empty on first apply, so the service can't pull an image yet.

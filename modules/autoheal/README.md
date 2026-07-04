@@ -46,10 +46,16 @@ loop for the recover-by-recycling case.
 - **The deploy-rollback alarm lives in `compute`, not here.** The ECS service must
   name it in its own `alarms{}` block; housing it here would create a
   compute→autoheal→compute module cycle. This module owns only the operational alarms.
-- **Least-privilege heal.** The Lambda gets `ecs:UpdateService` scoped to the one
-  service ARN, plus its own logs. `force-new-deployment` re-registers nothing, so no
-  `iam:PassRole`; the update response carries the deployment id, so no
-  `ecs:DescribeServices`.
+- **Least-privilege heal.** The Lambda gets `ecs:UpdateService` + `ecs:DescribeServices`
+  scoped to the one service ARN, plus its own logs. `force-new-deployment` re-registers
+  nothing, so no `iam:PassRole`.
+- **Cooldown guard against flapping.** EventBridge fires on every OK→ALARM edge, so a
+  flapping alarm would otherwise force a redeploy each time and never let the service
+  settle. Before healing, the Lambda reads the service's own deployment state (no
+  external store) and skips if a deployment is already rolling out or the last one
+  started within `heal_cooldown_seconds` (default 300s, ≥ the bake time). Reserved
+  concurrency of 1 serializes simultaneous alarms so they can't race into two
+  redeploys. This is why the Lambda now needs `ecs:DescribeServices`.
 
 ## How to deploy
 

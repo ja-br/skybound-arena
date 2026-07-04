@@ -1,9 +1,10 @@
 # The heal loop: EventBridge watches the two heal-trigger alarms transition to
 # ALARM and invokes the remediation Lambda, which forces a fresh ECS deployment.
 #
-# EventBridge fires on a state *transition* (OK→ALARM), not continuously, a stuck
-# alarm heals once. A flapping alarm is the churn source; a cooldown guard is the
-# documented future refinement.
+# EventBridge fires on a state *transition* (OK→ALARM), not continuously, so a stuck
+# alarm heals once. A *flapping* alarm (OK↔ALARM) is the churn source — the Lambda's
+# cooldown guard (see remediate.py) absorbs it by skipping a redeploy when one is
+# already in progress or the last one was within var.heal_cooldown_seconds.
 
 # --- Remediation Lambda ------------------------------------------------------
 data "archive_file" "remediate" {
@@ -33,11 +34,12 @@ resource "aws_iam_role" "remediate" {
 }
 
 # force-new-deployment reuses the current task def (registers nothing) → no
-# iam:PassRole. The update response carries the deployment id → no DescribeServices.
+# iam:PassRole. DescribeServices is needed for the cooldown guard (read the service's
+# current deployment state before deciding whether to redeploy).
 data "aws_iam_policy_document" "remediate" {
   statement {
     sid       = "ForceNewDeployment"
-    actions   = ["ecs:UpdateService"]
+    actions   = ["ecs:UpdateService", "ecs:DescribeServices"]
     resources = [local.service_arn]
   }
   statement {
@@ -62,10 +64,15 @@ resource "aws_lambda_function" "remediate" {
   source_code_hash = data.archive_file.remediate.output_base64sha256
   timeout          = 30
 
+  # Serialize invocations: if both heal alarms fire at once, the second waits and
+  # then sees the first's deployment in progress (cooldown guard) instead of racing.
+  reserved_concurrent_executions = 1
+
   environment {
     variables = {
-      CLUSTER = var.cluster_name
-      SERVICE = var.service_name
+      CLUSTER               = var.cluster_name
+      SERVICE               = var.service_name
+      HEAL_COOLDOWN_SECONDS = var.heal_cooldown_seconds
     }
   }
 

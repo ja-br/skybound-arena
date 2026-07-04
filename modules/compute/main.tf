@@ -299,9 +299,11 @@ resource "aws_ecs_service" "app" {
   wait_for_steady_state = false
 
   # The pipeline registers new task-def revisions and deploys them; don't revert
-  # the live revision on apply.
+  # the live revision on apply. Autoscaling (autoscaling.tf) owns desired_count at
+  # runtime, so ignore it too — otherwise an apply would snap a scaled-out service
+  # back to var.desired_count. desired_count here is only the initial/floor value.
   lifecycle {
-    ignore_changes = [task_definition]
+    ignore_changes = [task_definition, desired_count]
   }
 
   depends_on = [

@@ -75,3 +75,9 @@ variable "log_retention_days" {
   type        = number
   default     = 14
 }
+
+variable "heal_cooldown_seconds" {
+  description = "Minimum seconds since the last deployment before the heal Lambda will force another — absorbs flapping alarms. Should be >= the blue/green bake time."
+  type        = number
+  default     = 300
+}

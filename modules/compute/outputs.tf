@@ -22,6 +22,11 @@ output "service_name" {
   value       = aws_ecs_service.app.name
 }
 
+output "autoscaling_target_resource_id" {
+  description = "Application Auto Scaling resource id (describe-scaling-activities target)."
+  value       = aws_appautoscaling_target.ecs.resource_id
+}
+
 output "blue_target_group_name" {
   description = "Blue (initial production) target group name."
   value       = aws_lb_target_group.blue.name
